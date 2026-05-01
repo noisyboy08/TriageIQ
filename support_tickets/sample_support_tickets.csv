@@ -1,0 +1,3 @@
+Issue,Subject,Company,status,product_area,response,justification,request_type
+How do I reset my HackerRank password?,Password reset,HackerRank,replied,account_access,"To reset your HackerRank password, go to the login page and click 'Forgot Password'. Enter your registered email and follow the instructions sent to you.",Password reset is a standard FAQ covered in the support corpus.,product_issue
+I want Claude to stop crawling my website,Opt out of Claude web crawling,Claude,replied,privacy,"You can opt out of Claude crawling your website by adding the appropriate directives to your robots.txt file. Specifically, add: User-agent: ClaudeBot\nDisallow: /",The corpus covers Claude's web crawling opt-out policy.,product_issue

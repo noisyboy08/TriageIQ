@@ -25,3 +25,41 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 - `pnpm --filter @workspace/api-server run dev` — run API server locally
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+---
+
+## HackerRank Orchestrate — Support Triage Agent
+
+Python terminal agent for the HackerRank Orchestrate hackathon (May 2026).
+
+### Stack
+- **Language**: Python 3.11
+- **LLM**: Anthropic Claude via Replit AI Integration (`claude-sonnet-4-5`)
+- **Retrieval**: TF-IDF (stdlib only)
+- **Web scraper**: requests + BeautifulSoup4
+
+### Layout
+```
+code/               Python agent source
+  main.py           CLI entry point
+  agent.py          Anthropic triage + injection detection
+  retriever.py      TF-IDF retriever
+  corpus_fetcher.py Web scraper for 3 support sites
+data/               Scraped support corpus (gitignored)
+  hackerrank/
+  claude/
+  visa/
+support_tickets/    Input/output CSVs
+requirements.txt    Python dependencies
+```
+
+### Run
+```bash
+python code/main.py --build-corpus   # First run: scrape corpus + triage all tickets
+python code/main.py                  # Subsequent runs (corpus cached)
+python code/main.py --sample         # Test on sample tickets
+python code/main.py --verbose        # Verbose output
+```
+
+### Support Triage Agent (from earlier session)
+The `support-triage-agent/` directory is a separate interactive Rich-based triage tool for ad-hoc ticket input.
