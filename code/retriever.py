@@ -159,7 +159,7 @@ def get_context_for_ticket(
 
     parts: list[str] = []
     for i, doc in enumerate(docs, 1):
-        snippet = doc.content[:1500]
+        snippet = doc.content[:800]
         parts.append(
             f"--- Document {i} [{doc.company.upper()}] ---\n"
             f"Title: {doc.title}\n"

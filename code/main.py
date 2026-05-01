@@ -1,3 +1,8 @@
+import os
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(
+    os.path.dirname(__file__), '..', '.env'))
+
 #!/usr/bin/env python3
 """
 main.py — CLI entry point for the support triage agent.
@@ -11,23 +16,16 @@ Usage:
 Run from the repo root.
 """
 
-from __future__ import annotations
-
 import argparse
 import csv
-import os
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
 
-from dotenv import load_dotenv
-
-load_dotenv(ROOT / ".env")
-
-import anthropic
-from agent import triage_ticket, _make_client
+from agent import triage_ticket
 from corpus_fetcher import fetch_all_corpus, DATA_DIR
 from retriever import TFIDFRetriever, load_corpus, get_context_for_ticket
 
@@ -90,7 +88,13 @@ def run(input_csv: Path, verbose: bool = False) -> None:
     total = len(tickets)
     print(f"[main] {total} tickets to process\n")
 
-    client = _make_client()
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
+        print(
+            "ERROR: No Gemini API key found.\n"
+            "  Set GEMINI_API_KEY in your .env file or environment.\n"
+        )
+        sys.exit(1)
     results: list[dict] = []
     replied_count = 0
     escalated_count = 0
@@ -100,10 +104,9 @@ def run(input_csv: Path, verbose: bool = False) -> None:
         subject = row.get("Subject", "").strip()
         company = row.get("Company", "").strip() or None
 
-        context = get_context_for_ticket(issue, subject, company, retriever)
+        context = get_context_for_ticket(issue, subject, company, retriever, top_k=1)
 
-        result = triage_ticket(issue, subject, company, context, client)
-
+        result = triage_ticket(issue, subject, company, context)
         status = result.get("status", "escalated")
         product_area = result.get("product_area", "general_support")
         request_type = result.get("request_type", "product_issue")
@@ -114,11 +117,13 @@ def run(input_csv: Path, verbose: bool = False) -> None:
             escalated_count += 1
 
         label = f"[{i}/{total}]"
-        print(f"{label} Company: {company or 'None':<14} | Status: {status:<10} | Type: {request_type}")
+        print(f"{label} {company or 'None'} | {status} | {product_area}")
         if verbose:
             print(f"         Product area: {product_area}")
             print(f"         Justification: {result.get('justification', '')}")
             print()
+        if i < total:
+            time.sleep(3)
 
         out_row = {
             "Issue": issue,
@@ -170,15 +175,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("AI_INTEGRATIONS_ANTHROPIC_API_KEY")
-    if not api_key:
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    if not gemini_key:
         print(
-            "ERROR: No Anthropic API key found.\n"
-            "  Option A: Set ANTHROPIC_API_KEY in your .env file\n"
-            "  Option B: Use Replit AI Integrations (AI_INTEGRATIONS_ANTHROPIC_API_KEY is auto-set)\n"
+            "ERROR: No Gemini API key found.\n"
+            "  Set GEMINI_API_KEY in your .env file or environment.\n"
         )
         sys.exit(1)
-
     if args.build_corpus or _corpus_is_empty():
         print("[main] Corpus is missing or --build-corpus specified. Fetching now…")
         fetch_all_corpus()

@@ -1,0 +1,450 @@
+AI Chat Transcript - TriageIQ-Agent
+===================================
+
+Project: HackerRank Orchestrate Support Agent
+Workspace: TriageIQ-Agent
+Prepared for: Submission transcript upload
+
+Note: API keys and secrets have been intentionally redacted from this transcript.
+
+
+1. Initial Request
+------------------
+
+User requested fixes for the support triage agent because the `.env` file was not
+being loaded correctly.
+
+Requested actions:
+- Load `.env` explicitly from the project root in `code/main.py`.
+- Load `.env` explicitly from the project root in `code/agent.py`.
+- Configure the Gemini model in `agent.py`.
+- Remove unrelated Node/Replit/scaffolding files and folders.
+- Install required Python dependencies.
+- Run the corpus build and triage pipeline.
+- Produce `support_tickets/output.csv` with 29 responses.
+
+
+2. Environment and Repository Inspection
+----------------------------------------
+
+Assistant inspected the project structure under:
+
+`C:\Users\udayd\OneDrive\Desktop\TriageIQ\TriageIQ-Agent`
+
+Important files reviewed:
+- `code/main.py`
+- `code/agent.py`
+- `code/retriever.py`
+- `code/corpus_fetcher.py`
+- `support_tickets/support_tickets.csv`
+- `.env`
+- `README.md`
+
+The assistant confirmed the active project root was `TriageIQ-Agent`.
+
+
+3. Environment Loading Fixes
+----------------------------
+
+Assistant updated Python entry points so `.env` is loaded from the repository root:
+
+```python
+import os
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(
+    os.path.dirname(__file__), '..', '.env'))
+```
+
+This was applied to:
+- `code/main.py`
+- `code/agent.py`
+
+The assistant also later strengthened `code/agent.py` to fail loudly when the API
+key is missing:
+
+```python
+API_KEY = os.environ.get("GEMINI_API_KEY")
+if not API_KEY:
+    raise ValueError("GEMINI_API_KEY not set!")
+
+client = genai.Client(api_key=API_KEY)
+```
+
+
+4. Cleanup Work
+---------------
+
+User requested deletion of unrelated files and folders.
+
+Assistant removed root-level files:
+- `package.json`
+- `pnpm-lock.yaml`
+- `pnpm-workspace.yaml`
+- `tsconfig.json`
+- `tsconfig.base.json`
+- `.npmrc`
+- `.replit`
+- `.replitignore`
+- `replit.md`
+- `pyproject.toml`
+- `uv.lock`
+- root-level `main.py`
+
+Assistant removed folders:
+- `lib/`
+- `scripts/`
+- `tools/`
+- `support-triage-agent/`
+
+Assistant preserved the actual Python implementation under:
+- `code/main.py`
+- `code/agent.py`
+- `code/retriever.py`
+- `code/corpus_fetcher.py`
+
+
+5. Dependency Installation
+--------------------------
+
+User requested installation of:
+- `google-genai`
+- `python-dotenv`
+- `requests`
+- `beautifulsoup4`
+
+Assistant ran:
+
+```powershell
+pip install google-genai python-dotenv requests beautifulsoup4
+```
+
+The install completed successfully.
+
+
+6. Initial Pipeline Run
+-----------------------
+
+Assistant ran:
+
+```powershell
+python code/main.py --build-corpus
+```
+
+The first sandboxed run showed network/socket restrictions while scraping.
+Assistant reran the command with elevated permission for network access.
+
+Corpus build completed with:
+- HackerRank: 80 pages
+- Claude: 80 pages
+- Visa: 4 pages
+- Total saved pages: 164
+
+The pipeline processed 29 tickets, but the Gemini model initially returned quota
+errors for `gemini-2.0-flash`.
+
+
+7. Gemini Model Debugging
+-------------------------
+
+User clarified that the API key worked and requested exact Gemini client setup.
+
+Assistant updated `code/agent.py` to use:
+
+```python
+from google import genai
+from google.genai import types
+
+client = genai.Client(api_key=API_KEY)
+```
+
+Assistant configured the model call with:
+
+```python
+response = client.models.generate_content(
+    model="models/gemini-2.0-flash",
+    contents=user_message,
+    config=types.GenerateContentConfig(
+        system_instruction=SYSTEM_PROMPT,
+        temperature=0,
+        response_mime_type="application/json"
+    )
+)
+result = json.loads(response.text)
+```
+
+The API call failed loudly with:
+
+`429 RESOURCE_EXHAUSTED`
+
+Assistant verified this was not a local `.env` loading issue because the API
+returned a quota error from Google, meaning the request reached the API.
+
+
+8. Flash Lite and Gemma Testing
+-------------------------------
+
+User requested trying:
+
+`models/gemini-2.0-flash-lite`
+
+Assistant updated `code/agent.py` and `test_gemini.py` to use Flash Lite.
+
+Flash Lite also returned:
+
+`429 RESOURCE_EXHAUSTED`
+
+User had instructed that if Flash Lite failed, the assistant should try:
+
+`models/gemma-3-12b-it`
+
+Assistant updated `test_gemini.py` and tested Gemma.
+
+Gemma initially failed with:
+
+`JSON mode is not enabled for models/gemma-3-12b-it`
+
+Assistant removed `response_mime_type="application/json"` from the Gemma smoke
+test. The smoke test succeeded and printed:
+
+```text
+API WORKS: {
+  "status": "replied",
+  "product_area": "test",
+  "response": "working",
+  "justification": "test",
+  "request_type": "invalid"
+}
+```
+
+
+9. Main Pipeline Adaptation for Gemma
+-------------------------------------
+
+Because Gemma did not support JSON mode or `system_instruction`, assistant updated
+`code/agent.py` to:
+
+- Use `models/gemma-3-12b-it`.
+- Move system instructions into the user prompt.
+- Parse JSON text after stripping optional markdown fences.
+- Keep API failures loud.
+- Avoid mock or silent fallback behavior.
+
+Assistant added JSON text parsing:
+
+```python
+def _parse_json_text(raw_text):
+    raw_text = raw_text.strip()
+    raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+    raw_text = re.sub(r"\s*```$", "", raw_text)
+    return json.loads(raw_text.strip())
+```
+
+
+10. Safety and Routing Fixes
+----------------------------
+
+Assistant added deterministic pre-checks and post-model normalization for:
+
+- Prompt injection.
+- Attempts to reveal hidden rules.
+- Requests to delete all files.
+- Missing or `None` company values.
+- Identity theft.
+- Urgent cash/card issues.
+- Security vulnerability reports.
+
+Important enforced outcomes:
+
+- Prompt injection -> `escalated`, `security`, `invalid`
+- Delete-all-files request -> `escalated`, `security`, `invalid`
+- Missing company -> `escalated`, `general_support`, `invalid`
+- Identity theft or urgent cash -> `escalated`, `fraud`
+- Security vulnerability -> `escalated`, request type `bug`
+
+
+11. Token Quota Optimization
+----------------------------
+
+During a full run, Gemma hit a per-minute input token limit after several tickets.
+
+Assistant reduced prompt size by:
+- Retrieving only the top 1 corpus document per ticket.
+- Reducing corpus snippet length from 1500 characters to 800 characters.
+- Adding a short delay between ticket calls.
+
+Files updated:
+- `code/retriever.py`
+- `code/main.py`
+
+This allowed the full 29-ticket run to complete.
+
+
+12. Final Successful Pipeline Run
+---------------------------------
+
+Assistant ran:
+
+```powershell
+python code/main.py
+```
+
+The run completed all 29 tickets:
+
+```text
+[1/29] HackerRank | replied | HackerRank
+[2/29] Claude | replied | Claude
+[3/29] Visa | escalated | Visa
+[4/29] Claude | escalated | Claude
+[5/29] Visa | escalated | fraud
+[6/29] HackerRank | escalated | security
+[7/29] None | escalated | security
+[8/29] None | escalated | general_support
+[9/29] Visa | escalated | fraud
+[10/29] Claude | replied | Claude
+[11/29] HackerRank | replied | HackerRank
+[12/29] HackerRank | replied | HackerRank
+[13/29] Visa | escalated | Visa
+[14/29] Claude | replied | Claude
+[15/29] HackerRank | replied | HackerRank
+[16/29] Visa | escalated | Visa
+[17/29] HackerRank | replied | HackerRank
+[18/29] Claude | replied | Claude
+[19/29] Visa | escalated | Visa
+[20/29] Claude | replied | Claude
+[21/29] HackerRank | replied | HackerRank
+[22/29] Claude | replied | Claude
+[23/29] Visa | escalated | Visa
+[24/29] HackerRank | replied | HackerRank
+[25/29] Visa | escalated | security
+[26/29] HackerRank | replied | HackerRank
+[27/29] Claude | escalated | Claude
+[28/29] Visa | escalated | Visa
+[29/29] HackerRank | replied | HackerRank
+```
+
+Final output summary:
+
+```text
+Total tickets: 29
+Replied: 15
+Escalated: 14
+Output written: support_tickets/output.csv
+```
+
+
+13. Output Verification
+-----------------------
+
+Assistant verified:
+
+- `support_tickets/output.csv` contains exactly 29 rows plus header.
+- Columns are:
+  - `Issue`
+  - `Subject`
+  - `Company`
+  - `status`
+  - `product_area`
+  - `response`
+  - `justification`
+  - `request_type`
+- Status values contain a mix of `replied` and `escalated`.
+- The word `mock` does not appear in `output.csv`.
+- Responses are generated by the real model run.
+
+Specific required checks:
+
+```text
+French hidden-rules request:
+  escalated | security | invalid
+
+Delete-all-files request:
+  escalated | security | invalid
+
+Visa identity theft:
+  escalated | fraud | product_issue
+
+Claude security vulnerability:
+  escalated | Claude | bug
+
+Vague "it's not working" with Company=None:
+  escalated | general_support | invalid
+
+Visa urgent cash issue:
+  escalated | fraud | product_issue
+```
+
+The requested "Thank you for helping" ticket was not present in
+`support_tickets/support_tickets.csv`, so it could not be verified.
+
+
+14. README Documentation
+------------------------
+
+User requested a deep professional README.
+
+Assistant rewrote `README.md` to include:
+
+- Project overview.
+- Core capabilities.
+- Repository layout.
+- Runtime flow.
+- Input and output CSV schemas.
+- Environment setup.
+- Model configuration.
+- Smoke testing.
+- Corpus building.
+- Triage commands.
+- Safety and escalation rules.
+- Verification checklist.
+- Troubleshooting.
+- Development notes.
+
+Assistant checked that no API key was written into `README.md`.
+
+
+15. Final State
+---------------
+
+Important final files:
+
+- `README.md`
+  Detailed professional project documentation.
+
+- `code/main.py`
+  CLI orchestration, `.env` loading, CSV read/write, corpus build trigger,
+  per-ticket processing, output logging.
+
+- `code/agent.py`
+  Model call, prompt construction, JSON parsing, prompt-injection detection,
+  high-risk routing, strict error behavior.
+
+- `code/retriever.py`
+  TF-IDF corpus loader/retriever with shortened snippets for quota control.
+
+- `code/corpus_fetcher.py`
+  Scraper for HackerRank, Claude, and Visa support documentation.
+
+- `test_gemini.py`
+  Minimal API smoke test.
+
+- `support_tickets/output.csv`
+  Final generated output with 29 processed tickets.
+
+
+16. Professional Engineering Summary
+------------------------------------
+
+The implementation now follows a clean CLI-based RAG architecture:
+
+- Data ingestion is handled by `corpus_fetcher.py`.
+- Retrieval is handled locally with deterministic TF-IDF scoring.
+- LLM-specific behavior is isolated in `agent.py`.
+- `main.py` coordinates input, retrieval, triage, terminal reporting, and output.
+- Environment configuration is explicit and fail-fast.
+- Unsafe or ambiguous tickets are escalated instead of answered automatically.
+- The generated CSV preserves the required schema and contains a balanced mix of
+  replied and escalated results.
+
+The final solution avoids silent mock behavior and makes API/configuration errors
+visible during execution, which is important for production-quality debugging and
+evaluation transparency.
